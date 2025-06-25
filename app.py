@@ -2,6 +2,7 @@ import os
 from datetime import date
 from pathlib import Path
 from typing import Dict
+import re
 
 import streamlit as st
 import yaml
@@ -24,7 +25,14 @@ st.set_page_config(page_title="業務記録プラットフォーム", layout="wi
 def generate_markdown_frontmatter(data: Dict) -> str:
     """入力データをYAML frontmatter付きMarkdownに変換"""
     frontmatter = yaml.safe_dump(data, allow_unicode=True, sort_keys=False)
-    md_body = """\n# 記録本文\n\n- S:\n- O:\n- A:\n- P:\n"""
+    md_body = f"""
+# 記録本文
+
+- S: {data.get('S', '')}
+- O: {data.get('O', '')}
+- A: {data.get('A', '')}
+- P: {data.get('P', '')}
+"""
     return f"---\n{frontmatter}---\n{md_body}"
 
 
@@ -91,9 +99,22 @@ elif menu == "一覧":
         with st.expander(f"{rec.visit_date} | {rec.patient_name}"):
             st.markdown(f"**ID:** {rec.id}")
             st.markdown(f"**ファイル:** {rec.markdown_path}")
-            # プレビュー（Markdown → HTML）
             if os.path.exists(rec.markdown_path):
                 md_raw = Path(rec.markdown_path).read_text(encoding="utf-8")
-                st.markdown(md_raw, unsafe_allow_html=True)
+                # YAML frontmatter抽出
+                match = re.match(r"^---\n(.*?)\n---\n(.*)", md_raw, re.DOTALL)
+                if match:
+                    yaml_str, md_body = match.groups()
+                    meta = yaml.safe_load(yaml_str)
+                    # メタ情報をユーザーフレンドリーに表示
+                    st.info(
+                        f"**患者名:** {meta.get('patient_name', '')}　"
+                        f"**患者ID:** {meta.get('patient_id', '')}　"
+                        f"**診察日:** {meta.get('visit_date', '')}"
+                    )
+                    # 本文のみプレビュー
+                    st.markdown(md_body, unsafe_allow_html=True)
+                else:
+                    st.warning("YAML frontmatterの解析に失敗しました")
             else:
                 st.warning("Markdownファイルが見つかりませんでした") 
