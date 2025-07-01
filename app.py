@@ -61,34 +61,59 @@ if menu == "新規記録":
         submitted = st.form_submit_button("保存")
 
     if submitted:
-        meta = {
-            "patient_name": patient_name,
-            "patient_id": patient_id,
-            "visit_date": str(visit_date),
-            "prescription": prescription,
-            "S": s_val,
-            "O": o_val,
-            "A": a_val,
-            "P": p_val,
-        }
-        md_text = generate_markdown_frontmatter(meta)
+        # バリデーション
+        errors = []
+        if not patient_name:
+            errors.append("患者名は必須です。")
+        elif len(patient_name) > 50:
+            errors.append("患者名は50文字以内で入力してください。")
+        if not patient_id:
+            errors.append("患者IDは必須です。")
+        elif not re.match(r'^[a-zA-Z0-9_-]+$', patient_id):
+            errors.append("患者IDは英数字・ハイフン・アンダースコアのみ使用できます。")
+        if not prescription:
+            errors.append("処方内容は必須です。")
+        if not s_val:
+            errors.append("S (主観的情報)は必須です。")
+        if not o_val:
+            errors.append("O (客観的情報)は必須です。")
+        if not a_val:
+            errors.append("A (評価・考察)は必須です。")
+        if not p_val:
+            errors.append("P (計画・指導内容)は必須です。")
 
-        # ファイル保存
-        filename = f"{date.today().isoformat()}_{patient_name or 'noname'}.md".replace(" ", "_")
-        file_path = DATA_DIR / filename
-        file_path.write_text(md_text, encoding="utf-8")
+        if errors:
+            for err in errors:
+                st.error(err)
+        else:
+            meta = {
+                "patient_name": patient_name,
+                "patient_id": patient_id,
+                "visit_date": str(visit_date),
+                "prescription": prescription,
+                "S": s_val,
+                "O": o_val,
+                "A": a_val,
+                "P": p_val,
+            }
+            md_text = generate_markdown_frontmatter(meta)
 
-        # DB保存 (メタ情報のみ簡易的に)
-        with next(get_session()) as session:
-            rec = Record(
-                patient_name=patient_name,
-                patient_id=patient_id,
-                visit_date=visit_date,
-                markdown_path=str(file_path),
-            )
-            create_record(session, rec)
+            # ファイル保存
+            filename = f"{date.today().isoformat()}_{patient_name or 'noname'}.md".replace(" ", "_")
+            file_path = DATA_DIR / filename
+            file_path.write_text(md_text, encoding="utf-8")
 
-        st.success("記録を保存しました！")
+            # DB保存 (メタ情報のみ簡易的に)
+            with next(get_session()) as session:
+                rec = Record(
+                    patient_name=patient_name,
+                    patient_id=patient_id,
+                    visit_date=visit_date,
+                    markdown_path=str(file_path),
+                )
+                create_record(session, rec)
+
+            st.success("記録を保存しました！")
 
 elif menu == "一覧":
     st.header("📚 記録一覧")
